@@ -123,8 +123,7 @@ class Changelog:
 
     def _format_groups(self, groups):
         for item in CommitGroup:
-            group = groups[item]
-            if group:
+            if group := groups[item]:
                 yield self.format_module(item.value, group)
 
     def format_module(self, name, group):
@@ -282,20 +281,19 @@ class CommitRange:
 
             authors = [default_author] if default_author else []
             for line in iter(lambda: next(lines), self.COMMIT_SEPARATOR):
-                match = self.AUTHOR_INDICATOR_RE.match(line)
-                if match:
+                if match := self.AUTHOR_INDICATOR_RE.match(line):
                     authors = sorted(map(str.strip, line[match.end():].split(',')), key=str.casefold)
 
             commit = Commit(commit_hash, short, authors)
-            if skip and (self._start or not i):
-                logger.debug(f'Skipped commit: {commit}')
-                continue
-            elif skip:
-                logger.debug(f'Reached Release commit, breaking: {commit}')
-                break
+            if skip:
+                if self._start or not i:
+                    logger.debug(f'Skipped commit: {commit}')
+                    continue
+                else:
+                    logger.debug(f'Reached Release commit, breaking: {commit}')
+                    break
 
-            fix_match = self.FIXES_RE.search(commit.short)
-            if fix_match:
+            if fix_match := self.FIXES_RE.search(commit.short):
                 commitish = fix_match.group(1)
                 fixes[commitish].append(commit)
 
@@ -337,13 +335,12 @@ class CommitRange:
                 logger.info(f'CHANGE {self._commits[commit.hash]} -> {commit}')
                 self._commits[commit.hash] = commit
 
-        self._commits = {key: value for key, value in reversed(self._commits.items())}
+        self._commits = dict(reversed(self._commits.items()))
 
     def groups(self):
         groups = defaultdict(list)
         for commit in self:
-            upstream_re = self.UPSTREAM_MERGE_RE.match(commit.short)
-            if upstream_re:
+            if upstream_re := self.UPSTREAM_MERGE_RE.match(commit.short):
                 commit.short = f'[upstream] Merge up to youtube-dl {upstream_re.group(1)}'
 
             match = self.MESSAGE_RE.fullmatch(commit.short)
@@ -359,10 +356,21 @@ class CommitRange:
                     logger.debug(f'Priority: {message!r}')
                     group = CommitGroup.PRIORITY
 
-                if not details and prefix:
-                    if prefix not in ('core', 'downloader', 'extractor', 'misc', 'postprocessor', 'upstream'):
-                        logger.debug(f'Replaced details with {prefix!r}')
-                        details = prefix or None
+                if (
+                    not details
+                    and prefix
+                    and prefix
+                    not in (
+                        'core',
+                        'downloader',
+                        'extractor',
+                        'misc',
+                        'postprocessor',
+                        'upstream',
+                    )
+                ):
+                    logger.debug(f'Replaced details with {prefix!r}')
+                    details = prefix or None
 
                 if details == 'common':
                     details = None
@@ -380,12 +388,12 @@ class CommitRange:
 
             if not group:
                 group = CommitGroup.get(prefix.lower())
-                if not group:
-                    if self.EXTRACTOR_INDICATOR_RE.search(commit.short):
-                        group = CommitGroup.EXTRACTOR
-                    else:
-                        group = CommitGroup.POSTPROCESSOR
-                    logger.warning(f'Failed to map {commit.short!r}, selected {group.name}')
+            if not group:
+                if self.EXTRACTOR_INDICATOR_RE.search(commit.short):
+                    group = CommitGroup.EXTRACTOR
+                else:
+                    group = CommitGroup.POSTPROCESSOR
+                logger.warning(f'Failed to map {commit.short!r}, selected {group.name}')
 
             commit_info = CommitInfo(
                 details, sub_details, message.strip(),
@@ -461,8 +469,9 @@ if __name__ == '__main__':
 
     logger.info(f'Loaded {len(commits)} commits')
 
-    new_contributors = get_new_contributors(args.contributors_path, commits)
-    if new_contributors:
+    if new_contributors := get_new_contributors(
+        args.contributors_path, commits
+    ):
         if args.contributors:
             write_file(args.contributors_path, '\n'.join(new_contributors) + '\n', mode='a')
         logger.info(f'New contributors: {", ".join(new_contributors)}')

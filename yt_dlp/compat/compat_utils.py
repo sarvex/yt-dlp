@@ -37,10 +37,10 @@ class EnhancedModule(types.ModuleType):
         except AttributeError:
             if _is_dunder(attr):
                 raise
-            getter = getattr(self, '__getattr__', None)
-            if not getter:
+            if getter := getattr(self, '__getattr__', None):
+                ret = getter(attr)
+            else:
                 raise
-            ret = getter(attr)
         return ret.fget() if isinstance(ret, property) else ret
 
 
@@ -60,9 +60,10 @@ def passthrough_module(parent, child, allowed_attributes=(..., ), *, callback=la
     @functools.lru_cache(maxsize=None)
     def from_child(attr):
         nonlocal child
-        if attr not in allowed_attributes:
-            if ... not in allowed_attributes or _is_dunder(attr):
-                return _NO_ATTRIBUTE
+        if attr not in allowed_attributes and (
+            ... not in allowed_attributes or _is_dunder(attr)
+        ):
+            return _NO_ATTRIBUTE
 
         if isinstance(child, str):
             child = importlib.import_module(child, parent.__name__)
